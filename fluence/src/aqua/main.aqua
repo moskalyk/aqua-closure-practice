@@ -1,0 +1,44 @@
+aqua Main
+
+import "@fluencelabs/aqua-lib/builtin.aqua"
+import "@fluencelabs/aqua-lib/subnet.aqua"
+
+use "deals.aqua"
+use "hosts.aqua"
+import "services.aqua"
+
+-- IMPORTANT: Add exports for all functions that you want to run
+export helloWorld, Greeter
+
+service Greeter("greeter"):
+    say_hello(name: string) -> string
+    capitals(name: string) -> string
+    semi(name: string) -> string
+
+func foo(callback: string -> (), compute: string, peer: PeerId) -> string:
+    on peer:
+        res <- Greeter.semi(compute)
+    callback(res)
+    <- res
+
+func bar(name: string, peer: PeerId) -> string:
+    compute: *string
+    on peer:
+        compute <- Greeter.capitals(name)
+    <- compute!
+
+func helloWorld(name: string, peer: PeerId) -> string, string:
+    res: *string
+    status: *string
+
+    on peer:
+        closure = (name_closure: string):
+            res <<- Greeter.say_hello(name_closure)
+
+    status <- bar(foo(closure, name, peer), peer)
+
+    co status <- Peer.timeout(2000, "timeout")
+
+    if status! == "timeout":
+        res <<- "err"
+    <- res!, status!
